@@ -1,0 +1,274 @@
+---
+title: "Final Project"
+author: "Peter Stirpe"
+date: "May 17, 2018"
+output: html_document
+---
+
+
+1) Introduction
+
+This is a comprehensive Exploratory Data Analysis for League of Legends, which happens to be a very popular game in esports currently.
+
+The goal of this project is to analyze every aspect of TSM's (pro esports team) gameplay and find their secret to winning the most games. The data comes from 8 different CSV files obtained from kaggle and are timed from 2015 to current.
+
+In this markdown, we will first study and visualize the original data, as well as calculate many statistics for TSM based on their in game data. The reason I am choosing this experiement and TSM in particular is because TSM has been arguably the best team for a couple of years now and it is interesting to see what this team has that other teams dont. This experiment is dedicated to seeing what makes TSM so amazing that allows them to be consistenly the best team
+
+We will also analyze TSM's objective control and see how largly securing Dragon and Baron play into their sucess
+
+
+1.1) Load in libraries and all of the data
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+
+bans <- read_csv("bans.csv")
+structures <- read_csv("structures.csv")
+columns <- read_csv("_columns.csv")
+gold <- read_csv("gold.csv")
+kills <- read_csv("kills.csv")
+League_of_Legends <- read_csv("LeagueofLegends.csv")
+match_info <- read_csv("matchinfo.csv")
+monsters <- read_csv("monsters.csv")
+```
+
+1.2) File Structure and Content
+
+Lets have an overview of the data sets using the glimpse tool
+```{r}
+glimpse(bans)
+```
+```{r}
+glimpse(structures)
+```
+```{r}
+glimpse(columns)
+```
+```{r}
+gold
+```
+```{r}
+glimpse(kills)
+```
+```{r}
+glimpse(League_of_Legends)
+```
+```{r}
+glimpse(match_info)
+```
+```{r}
+glimpse(monsters)
+```
+
+
+1.3) Missing Values
+
+In this case there are a lot of missing values in some tables that correspond to bans and gold difference at a certain time. This is because some games go longer than others which causes there to be discrepencies with turning the data into a table. To handle this we will filter out games that go too long or too short based on our preferences of the data that we would like to present.
+
+There is also some missing data in the rDragons and bDragons category in the League of Legends table due to the fact that there only used to be one kind of dragon in the game and it would only reward gold. Today, there are 4 types of dragons which all have different affects that can greatly affect each game in many different ways. First I will analyze the Winrates based on 
+
+
+
+1.4) Calculate Winrate based on Red and Blue side
+
+Some teams perform better on different sides of the map due to the fact that they may be facing towards or away from certain objectives that can be obtainable during the game. For example, on Blue Side, the team should have a disadvantage for securing more dragons since they have to get around more terrain in order to get the dragon. This results in dragon being a more risky object compared to baron as baron is more obtainable given the terrain  
+
+```{r}
+
+library(ggplot2)
+
+# Pull TSM blueside data
+TSM_blueside<- select(League_of_Legends, 1:57) %>%
+  filter(match_info$blueTeamTag == "TSM" & League_of_Legends$League == "NALCS" & League_of_Legends$Type == "Season" & Year != "2018")
+
+# Pull TSM redside data
+TSM_redside <- select(League_of_Legends, 1:57) %>%
+  filter(League_of_Legends$redTeamTag == "TSM" & League_of_Legends$League == "NALCS" & League_of_Legends$Type == "Season" & Year != "2018") 
+  
+# Had 3 extra rows so we need to delete
+TSM_redside <- TSM_redside[-c(91, 92, 93), ]
+
+
+# Calculate amount of blue side wins and losses 
+TSMB_wins <- sum(TSM_blueside$bResult == 1)
+TSMB_loss <- sum(TSM_blueside$bResult == 0)
+TSMB_Total_Games <- TSMB_wins + TSMB_loss
+
+# Calculate amount of red side wins and losses 
+TSMR_wins <- sum(TSM_redside$rResult == 1)
+TSMR_loss <- sum(TSM_redside$rResult == 0)
+TSMR_Total_Games <- TSMR_wins + TSMR_loss
+
+# Winrate for Blue side
+TSMB_wr <-  TSMB_wins/TSMB_Total_Games
+TSMB_wr
+# Winrate for Red side
+TSMR_wr <- TSMR_wins/TSMR_Total_Games
+TSMR_wr
+
+```
+
+A simple Histogram is show below showing the difference in winrates between the red and the blue side
+```{r}
+# Histogram for blueside
+ggplot(TSM_blueside, aes(x = bResult)) +
+  geom_histogram()
+```
+```{r}
+# Histogram for redside
+ggplot(TSM_redside, aes(x = rResult)) +
+  geom_histogram()
+```
+
+
+
+2) OBJECTIVE CONTROl 
+  
+Since we calculated winrate, we should go a little deeper into our analysis and see how much influence objective control has one winrate. Calculating dragon, tower, inhibitor, and baron control should help our analysis become much more specific and important. 
+
+2.1) Amount of dragons obtained on Blue and Red side
+
+DISCLAIMER: First before I try and use the data involving dragon control, I need to tidy the data I want to use. In this block of code, I change the bDragon and rDragon column to contain the specific amount of dragons obtained in that match as an integer instead of its previous representation. ex) ([33.123, "AIR_DRAGON"]) now goes to "1"
+ex) ([14.234, "None"], [31.356, "None"]) now goes to "2" 
+ect...
+
+
+```{r}
+for(i in 1:90){
+  if(i < 28){
+    TSM_blueside$bDragons[i] <- as.character(str_count(TSM_blueside$bDragons[i],"None"))
+    TSM_redside$bDragons[i] <- as.character(str_count(TSM_redside$bDragons[i],"None"))
+    
+    TSM_blueside$rDragons[i] <- as.character(str_count(TSM_blueside$rDragons[i],"None"))
+    TSM_redside$rDragons[i] <- as.character(str_count(TSM_redside$rDragons[i],"None"))
+  }
+  if(i >= 28){
+  TSM_blueside$bDragons[i] <-as.character(str_count(TSM_blueside$bDragons[i],"DRAGON"))
+  TSM_redside$bDragons[i] <-as.character(str_count(TSM_redside$bDragons[i],"DRAGON"))
+  
+  TSM_blueside$rDragons[i] <-as.character(str_count(TSM_blueside$rDragons[i],"DRAGON"))
+  TSM_redside$rDragons[i] <-as.character(str_count(TSM_redside$rDragons[i],"DRAGON"))
+  }
+}
+# Convert all rDragon and bDragon columns to numerics instead of characters
+TSM_blueside$bDragons = as.numeric(TSM_blueside$bDragons)
+TSM_blueside$rDragons = as.numeric(TSM_blueside$rDragons)
+TSM_redside$bDragons = as.numeric(TSM_redside$bDragons)
+TSM_redside$rDragons = as.numeric(TSM_redside$rDragons)
+```
+
+2.2) Total Dragons per game
+
+In order to understand TSM's dragon control, we should calculate the amount of dragons generally secured in each game.
+
+I combine both TSM_bluesude and TSM_redside tables to achieve this goal. 
+```{r}
+# merging both datasets together to make one for a bargraph
+TSM_games <- rbind(TSM_blueside,TSM_redside)
+
+# Add a row to get total dragons in a game
+TSM_games <- mutate(TSM_games, total_drags = bDragons + rDragons)
+
+TSM_blueside <- mutate(TSM_blueside, total_drags = bDragons + rDragons)
+TSM_redside <- mutate(TSM_redside, total_drags = bDragons + rDragons)
+```
+
+
+It is interesting to see in this table that most games end when they have betweeen 3-5 dragons and barely any games every end when a team 
+has either 1-2 dragons or 6-8 dragons
+```{r}
+ggplot(TSM_games, aes(x = total_drags)) +
+  geom_histogram()
+
+
+```
+
+
+HOW MANY DRAGONS GET WHEN THEY ARE ON BLUESIDE
+```{r}
+ggplot(TSM_blueside, aes(x=bDragons)) +
+  geom_histogram() +
+  labs(title="Blue Side Dragons",
+          x="Dragons", y="Number of Occasions")
+
+# How many dragons TSM gets on BlueSide
+sum(TSM_blueside$bDragons)
+```
+
+HOW MANY DRAGONS TSM GET WHEN THEY ARE ON REDSIDE
+```{r}
+ggplot(TSM_redside, aes(x = rDragons)) +
+  geom_histogram() +
+  labs(title="Red Side Dragons",
+          x="Dragons", y="Number of Occasions")
+
+# How many dragons TSM gets on redside 
+sum(TSM_redside$rDragons)
+```
+
+There is some interesting correlation in the data anaylzed here. If we look at both tables, it seems that TSM gets around the same number of dragons on average. But, on the Red side, TSM tends to sometimes obtain 5, even 6 dragons. 
+
+Since TSM has the highest winrate on the blueside and that side averages at about 3 dragons per game, we should combine both tables together and see TSM's chance of winning when they have exactly 3 dragons
+
+
+2.3) Winrate based on 3 dragons
+
+We can calculate that TSM have won 90% of their games when they have only captured 3 drags a game on the red side
+```{r}
+threeDragRed <- select(TSM_redside, 1:58) %>%
+            filter(rDragons == '3')
+sum(threeDragRed$rResult == '1')/(sum(threeDragRed$rResult == '1') + sum(threeDragRed$rResult == '0'))
+```
+
+What makes this so interesting is that TSM only wins 57% of their games when they have only captured 3 drags a game on the blue side
+This correlates a lot to early dragons being hard to get early game on the blue side.
+```{r}
+threeDragBlue <- select(TSM_blueside, 1:58) %>%
+            filter(rDragons == '3')
+sum(threeDragBlue$bResult == '1')/(sum(threeDragBlue$bResult == '1') + sum(threeDragBlue$bResult == '0'))
+
+```
+
+2.4) Chances of winning based on any amount of dragons
+
+From this graph we create a visual table which also shows the realtionship between how any dragons they secure vs how many games they win.
+
+* The 0 1 on top of the tables stands for "loss" "win" respectively 
+* The 0-4 and 0-6 of the side of the tables stands for how many dragons secured each game
+
+```{r}
+table(TSM_blueside$bDragons,TSM_blueside$bResult)
+```
+```{r}
+table(TSM_redside$rDragons, TSM_redside$rResult)
+```
+
+3) GAME LENGTH
+
+Is this portion of the experiment, we will calculate how TSM closes out games based on the length of the game itself paired with their respective side and nothing else. 
+
+As you can see by the graph below, we create a linear regression line that shows how many dragons TSM obtains and how many dragons are obtained in the toatlity of the game that they play. The line being slightly slanted along with the color scheme of the total dragons shows that when when a game ends, it is usually when TSM has most or almost all of the dragons 
+
+```{r}
+ggplot(TSM_blueside, aes(x = bDragons, y = gamelength, color = total_drags)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+```
+
+```{r}
+ggplot(TSM_redside, aes(x = rDragons, y = gamelength, color = total_drags)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+```
+
+4) Conclusion
+
+I hope you got something out of reading this analysis and experiment. It is clear the importance of dragon objectives based on which side that a team may be placed on. TSM, being one of the best teams just need to keep focusing on objective control in the early game which can snowball their game to a win. 
+
+
+
+
+
